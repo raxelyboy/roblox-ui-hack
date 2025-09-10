@@ -1,6 +1,5 @@
 --// Roblox Exploit UI Script: Red-Black Theme
---// รวม Speed, Fly, Noclip, ESP (ชื่อ+สีเพื่อน), Godmode Ultimate
---// ปรับ mainFrame ให้ใหญ่พอสำหรับปุ่มใหญ่ + ช่องว่าง
+--// ปรับขนาดเล็กลง 1.5x, Godmode แน่นๆ, UI ลากได้
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -23,7 +22,8 @@ toggleButton.TextColor3 = Color3.fromRGB(0, 0, 0)
 toggleButton.Font = Enum.Font.Arial
 toggleButton.TextSize = 22
 
--- UI หลัก (ขยายให้พอดีกับปุ่มใหญ่ + เหลือพื้นที่ด้านบน-ล่าง)
+-- ปรับขนาด UI 1.5x (ย่อ)
+local scaleFactor = 1/1.5
 local buttonCount = 5
 local buttonHeight = 40 * 1.4
 local buttonSpacing = 10
@@ -31,7 +31,10 @@ local framePadding = 20
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Parent = ScreenGui
-mainFrame.Size = UDim2.new(0, 475, 0, buttonCount * (buttonHeight + buttonSpacing) + framePadding * 2)
+mainFrame.Size = UDim2.new(
+    0, 475 * scaleFactor,
+    0, (buttonCount * (buttonHeight + buttonSpacing) + framePadding * 2) * scaleFactor
+)
 mainFrame.Position = UDim2.new(0.5, -160, 0.5, -(mainFrame.Size.Y.Offset / 2))
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
 mainFrame.BackgroundTransparency = 0.2
@@ -65,8 +68,8 @@ end)
 local function createButton(text, order, callback)
     local btn = Instance.new("TextButton")
     btn.Parent = mainFrame
-    btn.Size = UDim2.new(0, 260*1.4, 0, buttonHeight)
-    btn.Position = UDim2.new(0.5, -182, 0, framePadding + (order-1) * (buttonHeight + buttonSpacing))
+    btn.Size = UDim2.new(0, 260*1.4*scaleFactor, 0, buttonHeight*scaleFactor)
+    btn.Position = UDim2.new(0.5, -(260*1.4*scaleFactor)/2, 0, framePadding*scaleFactor + (order-1)*(buttonHeight*scaleFactor + buttonSpacing*scaleFactor))
     btn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
     btn.Text = text
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -206,45 +209,39 @@ local function setESP(on)
     end
 end
 
--- GODMODE ULTIMATE
-local godConn, humDiedConn, hbConn, ancestryConn
+-- GODMODE ULTIMATE (แน่นๆ + แผนสำรอง)
+local godConn, humDiedConn, hbConn
 local function setGodmode(on)
     local char = player.Character
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hum or not hrp then return end
 
     if on then
         godConn = RunService.Heartbeat:Connect(function()
-            if hum and hum.Health < hum.MaxHealth then
+            if hum.Health < hum.MaxHealth then
                 hum.Health = hum.MaxHealth
             end
         end)
         humDiedConn = hum.Died:Connect(function()
-            task.wait()
-            hum.Health = hum.MaxHealth
-            hum:ChangeState(Enum.HumanoidStateType.Physics)
+            task.wait(0.1)
+            if hum then hum.Health = hum.MaxHealth end
         end)
-        ancestryConn = hum.AncestryChanged:Connect(function(_, parent)
-            if not parent then
-                local newHum = Instance.new("Humanoid")
-                newHum.Parent = char
-                hum = newHum
-            end
-        end)
+        -- แผนสำรองป้องกัน Physics
         hbConn = RunService.Heartbeat:Connect(function()
-            if not char:FindFirstChildOfClass("Humanoid") then
-                local newHum = Instance.new("Humanoid")
-                newHum.Health, newHum.MaxHealth = 100,100
-                newHum.Parent = char
-                hum = newHum
+            if hum.Health <= 0 then
+                hum.Health = hum.MaxHealth
+                if hrp then
+                    hrp.Velocity = Vector3.new(0,50,0)
+                    hum.PlatformStand = true
+                end
             end
         end)
     else
         if godConn then godConn:Disconnect() godConn=nil end
         if humDiedConn then humDiedConn:Disconnect() humDiedConn=nil end
         if hbConn then hbConn:Disconnect() hbConn=nil end
-        if ancestryConn then ancestryConn:Disconnect() ancestryConn=nil end
     end
 end
 
