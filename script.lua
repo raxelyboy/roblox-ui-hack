@@ -1,5 +1,6 @@
 --// Roblox Exploit UI Script: Red-Black Theme
 --// ปรับขนาดเล็กลง 1.5x, Godmode แน่นๆ, UI ลากได้
+--// เพิ่มฟีเจอร์สั่งให้ผู้เล่นตาย
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -24,7 +25,7 @@ toggleButton.TextSize = 22
 
 -- ปรับขนาด UI 1.5x (ย่อ)
 local scaleFactor = 1/1.5
-local buttonCount = 5
+local buttonCount = 7 -- เพิ่ม 2 สำหรับ TextBox + Submit Die
 local buttonHeight = 40 * 1.4
 local buttonSpacing = 10
 local framePadding = 20
@@ -171,7 +172,7 @@ local function setESP(on)
                         box.Size = Vector3.new(4,6,1)
                         box.Transparency = 0.5
                         if player:IsFriendsWith(plr.UserId) then
-                            box.Color3 = Color3.fromRGB(0,0,255) -- เพื่อน = ฟ้า
+                            box.Color3 = Color3.fromRGB(0,0,255)
                         else
                             box.Color3 = Color3.fromRGB(255,0,0)
                         end
@@ -228,7 +229,6 @@ local function setGodmode(on)
             task.wait(0.1)
             if hum then hum.Health = hum.MaxHealth end
         end)
-        -- แผนสำรองป้องกัน Physics
         hbConn = RunService.Heartbeat:Connect(function()
             if hum.Health <= 0 then
                 hum.Health = hum.MaxHealth
@@ -246,9 +246,8 @@ local function setGodmode(on)
 end
 
 -------------------------------------------------------------------
--- สร้างปุ่มทั้งหมด
-createButton("วิ่งเร็ว", 1, setSpeed)
-createButton("บิน", 2, setFly)
-createButton("NoClip", 3, setNoclip)
-createButton("ESP Player", 4, setESP)
-createButton("อมตะ", 5, setGodmode)
+-- ฟีเจอร์สั่งผู้เล่นตาย
+local dieTextBox = Instance.new("TextBox")
+dieTextBox.Parent = mainFrame
+dieTextBox.Size = UDim2.new(0, 260*1.4*scaleFactor, 0, buttonHeight*scaleFactor)
+dieTextBox.Position = UDim2.new(0.5, -(260*
