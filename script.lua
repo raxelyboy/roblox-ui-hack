@@ -6,29 +6,23 @@ local Prompts = game:GetService("ProximityPromptService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
--- [[ Global States ]]
+-- สถานะต่างๆ
 local speedValue = 16
 local noclip = false
 local fly = false
 local wallhack = false
 local astralActive = false
 local blinkEnabled = false
-
+local vBlinkActive = false -- สำหรับปุ่ม V พุ่ง
 local waypointsList = {}
 local waypointCount = 0
 local cameraRotX, cameraRotY = 0, 0
 local speedDragging = false
+local V_Blink_Toggle = false -- ควบคุมเปิด-ปิด V Blink
 
-local fakeCamPart = nil
-local markerPart = nil
-local ESP_TAG = "AIO_Perfect_ESP"
-local WP_FLAG_TAG = "AIO_Waypoint_Flag"
-
--- ============================
--- 1. UI Setup
--- ============================
+-- UI และโครงสร้าง
 local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-gui.Name = "AIO_Ultimate_FixedMenu"
+gui.Name = "AIO_Ultimate_Control"
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", gui)
@@ -38,7 +32,7 @@ frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 0
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
 
--- Drag functionality
+-- Drag
 local dragDragging, dragStart, startPos
 frame.InputBegan:Connect(function(input, gp)
     if not gp and input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -72,23 +66,21 @@ title.TextSize = 18
 title.TextXAlignment = Enum.TextXAlignment.Left
 
 -- Close Button
-local destroyBtn = Instance.new("TextButton", frame)
-destroyBtn.Size = UDim2.new(0, 26, 0, 26)
-destroyBtn.Position = UDim2.new(1, -36, 0, 7)
-destroyBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
-destroyBtn.Text = "X"
-destroyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-destroyBtn.Font = Enum.Font.SourceSansBold
-destroyBtn.TextSize = 14
-destroyBtn.BorderSizePixel = 0
-Instance.new("UICorner", destroyBtn).CornerRadius = UDim.new(0, 5)
-destroyBtn.MouseButton1Click:Connect(function()
+local closeBtn = Instance.new("TextButton", frame)
+closeBtn.Size = UDim2.new(0, 26, 0, 26)
+closeBtn.Position = UDim2.new(1, -36, 0, 7)
+closeBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Font = Enum.Font.SourceSansBold
+closeBtn.TextSize = 14
+closeBtn.BorderSizePixel = 0
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 5)
+closeBtn.MouseButton1Click:Connect(function()
     gui:Destroy()
 end)
 
--- ============================
--- 2. Speed Slider
--- ============================
+-- Speed Slider
 local speedLabel = Instance.new("TextLabel", frame)
 speedLabel.Position = UDim2.new(0, 15, 0, 45)
 speedLabel.Size = UDim2.new(1, -30, 0, 20)
@@ -141,9 +133,7 @@ UIS.InputChanged:Connect(function(input)
     end
 end)
 
--- ============================
--- 3. Button creation helper
--- ============================
+-- Helper function to create buttons
 local buttonCount = 0
 local function createMenuButton(txt, col)
     buttonCount = buttonCount + 1
@@ -161,7 +151,7 @@ local function createMenuButton(txt, col)
     return btn
 end
 
--- Buttons
+-- สร้างปุ่ม
 local noclipBtn = createMenuButton("NoClip: OFF", Color3.fromRGB(55, 55, 55))
 local flyBtn = createMenuButton("Fly System: OFF", Color3.fromRGB(55, 55, 55))
 local wallBtn = createMenuButton("Wallhack: OFF", Color3.fromRGB(55, 55, 55))
@@ -172,14 +162,13 @@ local tpAstralBtn = createMenuButton("⚡ TP to Astral Marker", Color3.fromRGB(0
 tpAstralBtn.Visible = false
 
 -- ============================
--- 4. NoClip & Wallhack
+-- 3. ระบบ NoClip
 -- ============================
 local function toggleNoClip()
     noclip = not noclip
     noclipBtn.Text = noclip and "NoClip: ON" or "NoClip: OFF"
     noclipBtn.BackgroundColor3 = noclip and Color3.fromRGB(180, 40, 40) or Color3.fromRGB(55, 55, 55)
 end
-
 noclipBtn.MouseButton1Click:Connect(toggleNoClip)
 
 RunService.Stepped:Connect(function()
@@ -187,9 +176,19 @@ RunService.Stepped:Connect(function()
         for _, v in pairs(player.Character:GetDescendants()) do
             if v:IsA("BasePart") then v.CanCollide = false end
         end
+    else
+        -- ถ้าปิด ให้คืนค่า CanCollide = true สำหรับทุกส่วน
+        if player.Character then
+            for _, v in pairs(player.Character:GetDescendants()) do
+                if v:IsA("BasePart") then v.CanCollide = true end
+            end
+        end
     end
 end)
 
+-- ============================
+-- 4. Wallhack (ESP)
+-- ============================
 local function removeAllESP()
     for _, p in pairs(Players:GetPlayers()) do
         if p.Character and p.Character:FindFirstChild(ESP_TAG) then
@@ -214,7 +213,7 @@ local function applyESP(targetPlayer)
     if targetPlayer.Character then setupHighlight(targetPlayer.Character) end
 end
 
-wallBtn.MouseButton1Click:Connect(function()
+local function toggleWallHack()
     wallhack = not wallhack
     wallBtn.Text = wallhack and "Wallhack: ON" or "Wallhack: OFF"
     wallBtn.BackgroundColor3 = wallhack and Color3.fromRGB(180, 40, 40) or Color3.fromRGB(55, 55, 55)
@@ -225,14 +224,14 @@ wallBtn.MouseButton1Click:Connect(function()
     else
         removeAllESP()
     end
-end)
-
+end
+wallBtn.MouseButton1Click:Connect(toggleWallHack)
 Players.PlayerAdded:Connect(function(p)
     applyESP(p)
 end)
 
 -- ============================
--- 5. Fly System
+-- 5. ระบบบิน (Fly)
 -- ============================
 local function disableFly()
     fly = false
@@ -242,10 +241,10 @@ local function disableFly()
     local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
     if root and hum then
         hum:ChangeState(Enum.HumanoidStateType.Running)
-        local bVel = root:FindFirstChildOfClass("BodyVelocity")
-        local bGyro = root:FindFirstChildOfClass("BodyGyro")
-        if bVel then bVel:Destroy() end
-        if bGyro then bGyro:Destroy() end
+        -- ลบ BodyVelocity / BodyGyro
+        for _, v in pairs(root:GetChildren()) do
+            if v:IsA("BodyVelocity") or v:IsA("BodyGyro") then v:Destroy() end
+        end
     end
 end
 
@@ -254,14 +253,13 @@ local function toggleFly()
     local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
     if not root or not hum then return end
     fly = not fly
-
     if fly then
         hum:ChangeState(Enum.HumanoidStateType.Physics)
         local bv = Instance.new("BodyVelocity", root)
-        bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+        bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
         bv.Velocity = Vector3.new(0, 0, 0)
         local bg = Instance.new("BodyGyro", root)
-        bg.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+        bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
         bg.CFrame = root.CFrame
     else
         disableFly()
@@ -269,11 +267,10 @@ local function toggleFly()
     flyBtn.Text = fly and "Fly System: ON" or "Fly System: OFF"
     flyBtn.BackgroundColor3 = fly and Color3.fromRGB(180, 40, 40) or Color3.fromRGB(55, 55, 55)
 end
-
 flyBtn.MouseButton1Click:Connect(toggleFly)
 
 -- ============================
--- 6. Astral Form
+-- 6. Astral Form & TP
 -- ============================
 local function removeMarker()
     if markerPart then
@@ -317,14 +314,13 @@ local function disableAstral()
     local char = player.Character
     if char then
         local hum = char:FindFirstChildOfClass("Humanoid")
-        local root = char:FindFirstChild("HumanoidRootPart")
         if hum then
             cam.CameraSubject = hum
             hum.AutoRotate = true
         end
+        local root = char:FindFirstChild("HumanoidRootPart")
         if root then root.Anchored = false end
     end
-
     UIS.MouseBehavior = Enum.MouseBehavior.Default
 end
 
@@ -341,14 +337,10 @@ local function toggleAstral()
     tpAstralBtn.Visible = astralActive
 
     if astralActive then
-        if fly then
-            disableFly()
-        end
-        -- Set camera to scriptable mode
+        if fly then disableFly() end
         local look = camera.CFrame.LookVector
         cameraRotX = math.atan2(-look.X, -look.Z)
         cameraRotY = math.asin(look.Y)
-
         if not fakeCamPart then
             fakeCamPart = Instance.new("Part", workspace)
             fakeCamPart.Size = Vector3.new(1, 1, 1)
@@ -360,9 +352,7 @@ local function toggleAstral()
         camera.CameraType = Enum.CameraType.Scriptable
         camera.CameraSubject = fakeCamPart
         local rootPart = root
-        if rootPart then
-            rootPart.Anchored = true
-        end
+        if rootPart then rootPart.Anchored = true end
         UIS.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
     else
         disableAstral()
@@ -383,33 +373,32 @@ local function teleportToMarker()
         disableAstral()
     end
 end
-
-tpAstralBtn.MouseButton1Click:Connect(teleportToMarker)
+tpAstralBtn.MouseButton1Click = teleportToMarker
 
 -- ============================
--- 7. V Teleport & Waypoints
+-- 7. V Blink & Waypoints
 -- ============================
-blinkBtn.MouseButton1Click:Connect(function()
-    blinkEnabled = not blinkEnabled
-    blinkBtn.Text = blinkEnabled and "Blink (V Key): ON" or "Blink (V Key): OFF"
-    blinkBtn.BackgroundColor3 = blinkEnabled and Color3.fromRGB(180, 40, 40) or Color3.fromRGB(55, 55, 55)
-end)
+local function toggleVBlink()
+    V_Blink_Toggle = not V_Blink_Toggle
+    blinkBtn.Text = V_Blink_Toggle and "V Blink: ON" or "V Blink: OFF"
+    blinkBtn.BackgroundColor3 = V_Blink_Toggle and Color3.fromRGB(180, 40, 40) or Color3.fromRGB(55, 55, 55)
+end
+blinkBtn.MouseButton1Click = toggleVBlink
 
 UIS.InputBegan:Connect(function(input, gp)
     if gp or input.UserInputType ~= Enum.UserInputType.Keyboard then return end
-    if input.KeyCode ~= Enum.KeyCode.V or not blinkEnabled or astralActive then return end
-
+    if input.KeyCode ~= Enum.KeyCode.V or not V_Blink_Toggle or astralActive then return end
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not root or not hum or hum.Health <= 0 then return end
 
     task.spawn(function()
-        root.Velocity = Vector3.new(0, 0, 0)
-        root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        root.Velocity = Vector3.new(0,0,0)
+        root.AssemblyLinearVelocity = Vector3.new(0,0,0)
         hum:ChangeState(Enum.HumanoidStateType.Physics)
         local lookDir = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z).Unit
-        for i = 1, 12 do
+        for i=1,12 do
             if not root then break end
             root.CFrame = root.CFrame + (lookDir * 1.5) + Vector3.new(0, 0.05, 0)
             for _, part in pairs(player.Character:GetDescendants()) do
@@ -421,64 +410,65 @@ UIS.InputBegan:Connect(function(input, gp)
         end
         task.wait(0.02)
         if root and hum then
-            root.Velocity = Vector3.new(0, 0, 0)
-            root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            root.Velocity = Vector3.new(0,0,0)
+            root.AssemblyLinearVelocity = Vector3.new(0,0,0)
             hum:ChangeState(Enum.HumanoidStateType.Running)
         end
     end)
 end)
 
+-- ============================
+-- 8. Waypoint System
+-- ============================
 local function updateWaypointUI()
     -- Clear existing
     for _, child in pairs(scrollFrame:GetChildren()) do
-        if child:IsA("Frame") then
-            child:Destroy()
-        end
+        if child:IsA("Frame") then child:Destroy() end
     end
-    -- Populate with new waypoints
+    -- Populate new
     for id, wpData in pairs(waypointsList) do
-        local frameItem = Instance.new("Frame", scrollFrame)
-        frameItem.Size = UDim2.new(1, -10, 0, 36)
-        frameItem.BackgroundTransparency = 1
+        local r = Instance.new("Frame", scrollFrame)
+        r.Size = UDim2.new(1, -10, 0, 36)
+        r.BackgroundTransparency = 1
 
-        local tpBtn = Instance.new("TextButton", frameItem)
-        tpBtn.Size = UDim2.new(0, 205, 1, -4)
-        tpBtn.Position = UDim2.new(0, 5, 0, 2)
-        tpBtn.BackgroundColor3 = Color3.fromRGB(45, 55, 50)
-        tpBtn.Text = "⚡ " .. wpData.Name
-        tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        tpBtn.Font = Enum.Font.SourceSansBold
-        tpBtn.TextSize = 13
-        tpBtn.BorderSizePixel = 0
-        Instance.new("UICorner", tpBtn)
+        local tp = Instance.new("TextButton", r)
+        tp.Size = UDim2.new(0, 205, 1, -4)
+        tp.Position = UDim2.new(0, 5, 0, 2)
+        tp.BackgroundColor3 = Color3.fromRGB(45, 55, 50)
+        tp.Text = "⚡ " .. wpData.Name
+        tp.TextColor3 = Color3.fromRGB(255, 255, 255)
+        tp.Font = Enum.Font.SourceSansBold
+        tp.TextSize = 13
+        tp.BorderSizePixel = 0
+        Instance.new("UICorner", tp)
 
-        local delBtn = Instance.new("TextButton", frameItem)
-        delBtn.Size = UDim2.new(0, 55, 1, -4)
-        delBtn.Position = UDim2.new(0, 215, 0, 2)
-        delBtn.BackgroundColor3 = Color3.fromRGB(130, 40, 40)
-        delBtn.Text = "Delete"
-        delBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        delBtn.Font = Enum.Font.SourceSansBold
-        delBtn.TextSize = 11
-        delBtn.BorderSizePixel = 0
-        Instance.new("UICorner", delBtn)
+        local del = Instance.new("TextButton", r)
+        del.Size = UDim2.new(0, 55, 1, -4)
+        del.Position = UDim2.new(0, 215, 0, 2)
+        del.BackgroundColor3 = Color3.fromRGB(130,40,40)
+        del.Text = "Delete"
+        del.TextColor3 = Color3.fromRGB(255,255,255)
+        del.Font = Enum.Font.SourceSansBold
+        del.TextSize = 11
+        del.BorderSizePixel = 0
+        Instance.new("UICorner", del)
 
-        tpBtn.MouseButton1Click:Connect(function()
+        tp.MouseButton1Click:Connect(function()
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             if root and hum and hum.Health > 0 then
                 if fly then disableFly() end
-                root.Velocity = Vector3.new(0, 0, 0)
-                root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                root.CFrame = wpData.CFrame + Vector3.new(0, 1.2, 0)
+                root.Velocity = Vector3.new(0,0,0)
+                root.AssemblyLinearVelocity = Vector3.new(0,0,0)
+                root.CFrame = wpData.CFrame + Vector3.new(0,1.2,0)
                 task.wait(0.06)
                 root.Anchored = false
                 hum:ChangeState(Enum.HumanoidStateType.Running)
             end
         end)
 
-        delBtn.MouseButton1Click:Connect(function()
+        del.MouseButton1Click:Connect(function()
             if wpData.VisualPart then wpData.VisualPart:Destroy() end
             table.remove(waypointsList, id)
             updateWaypointUI()
@@ -494,176 +484,126 @@ setWpBtn.MouseButton1Click:Connect(function()
     waypointCount = waypointCount + 1
     local flag = Instance.new("Part", workspace)
     flag.Name = WP_FLAG_TAG
-    flag.Size = Vector3.new(0.5, 7, 0.5)
+    flag.Size = Vector3.new(0.5,7,0.5)
     flag.Material = Enum.Material.Neon
-    flag.Color = Color3.fromRGB(0, 255, 100)
+    flag.Color = Color3.fromRGB(0,255,100)
     flag.Transparency = 0.4
     flag.Anchored = true
     flag.CanCollide = false
     flag.CFrame = root.CFrame * CFrame.new(0, -1, 0)
     local hl = Instance.new("Highlight", flag)
-    hl.FillColor = Color3.fromRGB(0, 255, 100)
+    hl.FillColor = Color3.fromRGB(0,255,100)
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    table.insert(waypointsList, {Name = "Waypoint " .. waypointCount, CFrame = root.CFrame, VisualPart = flag})
+    table.insert(waypointsList, {Name="Waypoint "..waypointCount, CFrame=root.CFrame, VisualPart=flag})
     updateWaypointUI()
 end)
 
 -- ============================
--- 8. Reset on Character Spawn
+-- 9. Reset on spawn
 -- ============================
-local function onCharacterSpawn(char)
-    -- Reset states
-    fly = false
-    noclip = false
-    disableFly()
-    disableAstral()
-
-    noclipBtn.Text, flyBtn.Text = "NoClip: OFF", "Fly System: OFF"
-    noclipBtn.BackgroundColor3, flyBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 55), Color3.fromRGB(55, 55, 55)
-
-    -- Clear waypoints
-    for _, wpData in pairs(waypointsList) do
-        if wpData.VisualPart then wpData.VisualPart:Destroy() end
-        local flag = Instance.new("Part", workspace)
-        flag.Name = WP_FLAG_TAG
-        flag.Size = Vector3.new(0.5, 7, 0.5)
-        flag.Material = Enum.Material.Neon
-        flag.Color = Color3.fromRGB(0, 255, 100)
-        flag.Transparency = 0.4
-        flag.Anchored = true
-        flag.CanCollide = false
-        flag.CFrame = wpData.CFrame * CFrame.new(0, -1, 0)
-        local hl = Instance.new("Highlight", flag)
-        hl.FillColor = Color3.fromRGB(0, 255, 100)
-        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        wpData.VisualPart = flag
+local function resetAll()
+    -- ปิดระบบ
+    if fly then disableFly() end
+    if noclip then
+        noclip = false
+        noclipBtn.Text = "NoClip: OFF"
+        noclipBtn.BackgroundColor3 = Color3.fromRGB(55,55,55)
     end
-
-    local hum = nil
-    if player.Character then
-        hum = player.Character:FindFirstChildOfClass("Humanoid")
+    if wallhack then
+        wallhack = false
+        wallBtn.Text = "Wallhack: OFF"
+        wallBtn.BackgroundColor3 = Color3.fromRGB(55,55,55)
+        removeAllESP()
     end
-    if hum then hum.WalkSpeed = speedValue end
+    -- ล้างค่าฟิสิกส์และกล้อง
+    local char = player.Character
+    if char then
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if root and hum then
+            hum:ChangeState(Enum.HumanoidStateType.Running)
+            -- ลบ BodyVelocity / BodyGyro
+            for _, v in pairs(root:GetChildren()) do
+                if v:IsA("BodyVelocity") or v:IsA("BodyGyro") then v:Destroy() end
+            end
+            root.Anchored = false
+        end
+        -- Reset speed
+        if hum then hum.WalkSpeed = 16 end
+    end
+    -- ล้าง waypoint
+    for _, wp in pairs(waypointsList) do
+        if wp.VisualPart then wp.VisualPart:Destroy() end
+    end
+    waypointsList = {}
+    waypointCount = 0
+    updateWaypointUI()
 end
 
-player.CharacterAdded:Connect(onCharacterSpawn)
-if player.Character then
-    onCharacterSpawn(player.Character)
-end
+player.CharacterAdded:Connect(function()
+    -- รอให้ตัวละคร spawn ก่อน
+    local function onChar(char)
+        resetAll()
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = speedValue end
+    end
+    onChar(player.Character)
+end)
 
 -- ============================
--- 9. Render Loop (Main)
+-- 10. Render Loop
 -- ============================
 RunService.RenderStepped:Connect(function()
     local char = player.Character
     if not char then return end
     local root = char:FindFirstChild("HumanoidRootPart")
     local hum = char:FindFirstChildOfClass("Humanoid")
+    if not root or not hum then return end
 
-    -- Fly movement
-    if fly and root and hum and hum.Health > 0 then
+    -- ระบบบิน
+    if fly then
         local bVel = root:FindFirstChildOfClass("BodyVelocity")
         local bGyro = root:FindFirstChildOfClass("BodyGyro")
         if bVel and bGyro then
-            hum:ChangeState(Enum.HumanoidStateType.Physics)
-            local look = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z).Unit
+            hum:ChangeState(Enum.HumanoidStateType.Physics) -- Lock model
+            local forward = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z).Unit
             local right = Vector3.new(camera.CFrame.RightVector.X, 0, camera.CFrame.RightVector.Z).Unit
             local mX, mZ = 0, 0
             if UIS:IsKeyDown(Enum.KeyCode.W) or UIS:IsKeyDown(Enum.KeyCode.Up) then mZ = mZ + 1 end
             if UIS:IsKeyDown(Enum.KeyCode.S) or UIS:IsKeyDown(Enum.KeyCode.Down) then mZ = mZ - 1 end
             if UIS:IsKeyDown(Enum.KeyCode.A) or UIS:IsKeyDown(Enum.KeyCode.Left) then mX = mX - 1 end
             if UIS:IsKeyDown(Enum.KeyCode.D) or UIS:IsKeyDown(Enum.KeyCode.Right) then mX = mX + 1 end
-            local hVel = (mX ~= 0 or mZ ~= 0) and ((look * mZ) + (right * mX)).Unit or Vector3.new(0, 0, 0)
-            bGyro.CFrame = CFrame.lookAt(root.Position, root.Position + (hVel.Magnitude > 0 and hVel or look))
-            local vVel = UIS:IsKeyDown(Enum.KeyCode.Space) and 1 or (UIS:IsKeyDown(Enum.KeyCode.LeftControl) and -1 or 0)
+            local hVel = (mX ~= 0 or mZ ~= 0) and ((forward * mZ) + (right * mX)).Unit or Vector3.new(0,0,0)
+            bGyro.CFrame = CFrame.lookAt(root.Position, root.Position + (hVel.Magnitude > 0 and hVel or forward))
+            local vVel = 0
+            if UIS:IsKeyDown(Enum.KeyCode.Space) then vVel = 1 end
+            if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then vVel = -1 end
             bVel.Velocity = (hVel * speedValue) + Vector3.new(0, vVel * speedValue, 0)
         end
     end
 
-    -- Astral control
-    if astralActive and fakeCamPart then
-        if UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-            UIS.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
-            local mouseDelta = UIS:GetMouseDelta()
-            cameraRotX = cameraRotX - (mouseDelta.X * (MOUSE_SENSITIVITY / 100))
-            cameraRotY = cameraRotY - (mouseDelta.Y * (MOUSE_SENSITIVITY / 100))
-            cameraRotY = math.clamp(cameraRotY, math.rad(-89), math.rad(89))
-        else
-            UIS.MouseBehavior = Enum.MouseBehavior.Default
-        end
-        camera.CFrame = CFrame.new(camera.CFrame.Position) *
-            CFrame.Angles(0, cameraRotX, 0) *
-            CFrame.Angles(cameraRotY, 0, 0)
-
-        -- Move camera
-        local moveVector = Vector3.new(0, 0, 0)
-        if UIS:IsKeyDown(Enum.KeyCode.W) then moveVector = moveVector + camera.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.S) then moveVector = moveVector - camera.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.A) then moveVector = moveVector - camera.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.D) then moveVector = moveVector + camera.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.Space) then moveVector = moveVector + Vector3.new(0, 1, 0) end
-        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then moveVector = moveVector - Vector3.new(0, 1, 0) end
-
-        if moveVector.Magnitude > 0 then
-            camera.CFrame = camera.CFrame + (moveVector.Unit * CAM_SPEED)
-            if fakeCamPart then fakeCamPart.CFrame = camera.CFrame end
-        end
-
-        -- Update marker position
-        if markerPart then
-            local raycastParams = RaycastParams.new()
-            raycastParams.FilterDescendantsInstances = {char, markerPart}
-            raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-            local raycastResult = workspace:Raycast(camera.CFrame.Position, Vector3.new(0, -600, 0), raycastParams)
-            local targetY = camera.CFrame.Position.Y - 3
-            if raycastResult then
-                targetY = raycastResult.Position.Y + 1.75
-            end
-            markerPart.CFrame = CFrame.lookAt(Vector3.new(camera.CFrame.Position.X, targetY, camera.CFrame.Position.Z),
-                Vector3.new(camera.CFrame.Position.X, targetY, camera.CFrame.Position.Z) + Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)) * CFrame.Angles(0, 0, math.rad(90))
+    -- ระบบ V Blink
+    if V_Blink_Toggle then
+        -- พุ่งทะลุ 5 เมตร
+        local rootPos = root.Position
+        local lookDir = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z).Unit
+        if UIS:IsKeyDown(Enum.KeyCode.V) then
+            -- ใช้ AssemblyLinearVelocity ล้างค่า
+            root.AssemblyLinearVelocity = Vector3.new(0,0,0)
+            root.Velocity = Vector3.new(0,0,0)
+            root.CFrame = root.CFrame * CFrame.new(lookDir * 5)
         end
     end
+
+    -- ระบบกล้องและวาร์ปผ่านจุด Waypoint
+    -- (ถ้าคุณต้องการให้เป็น optional ก็แค่เปิด/ปิดตาม)
 end)
 
--- ============================
--- 10. Additional: Character Spawn Handling
--- ============================
-local function onCharacterSpawn(char)
-    -- Reset states
-    fly = false
-    noclip = false
-    disableFly()
-    disableAstral()
-
-    noclipBtn.Text, flyBtn.Text = "NoClip: OFF", "Fly System: OFF"
-    noclipBtn.BackgroundColor3, flyBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 55), Color3.fromRGB(55, 55, 55)
-
-    -- Clear waypoints
-    for _, wpData in pairs(waypointsList) do
-        if wpData.VisualPart then wpData.VisualPart:Destroy() end
-        local flag = Instance.new("Part", workspace)
-        flag.Name = WP_FLAG_TAG
-        flag.Size = Vector3.new(0.5, 7, 0.5)
-        flag.Material = Enum.Material.Neon
-        flag.Color = Color3.fromRGB(0, 255, 100)
-        flag.Transparency = 0.4
-        flag.Anchored = true
-        flag.CanCollide = false
-        flag.CFrame = wpData.CFrame * CFrame.new(0, -1, 0)
-        local hl = Instance.new("Highlight", flag)
-        hl.FillColor = Color3.fromRGB(0, 255, 100)
-        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        wpData.VisualPart = flag
-    end
-
-    local hum = nil
-    if player.Character then
-        hum = player.Character:FindFirstChildOfClass("Humanoid")
-    end
+-- เพิ่มกลไกใน CharacterAdded เพื่อรีเซ็ตสถานะทุกอย่าง
+player.CharacterAdded:Connect(function()
+    wait(0.1) -- รอให้ตัวละคร spawn เสร็จ
+    resetAll()
+    -- ตั้งค่าความเร็วให้ทันที
+    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
     if hum then hum.WalkSpeed = speedValue end
-end
-
-player.CharacterAdded:Connect(onCharacterSpawn)
-if player.Character then
-    onCharacterSpawn(player.Character)
-end
+end)
